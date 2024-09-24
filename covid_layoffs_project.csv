@@ -1,6 +1,217 @@
-year(`date`),laid_off
-2022,160661
-2023,125677
-2020,80998
-2021,15823
-NULL,500
+-- -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- -----------------------------------------------------------------Data Cleaning-----------------------------------------------------------------------------------------------
+use layoffs_project;
+
+
+-- -----------------------------------------------------------------Remove Duplicates-------------------------------------------------------------------------------------------
+
+
+with duplicate_cte as
+(select *,
+row_number() over(partition by company,location,industry,total_laid_off,`date`,stage,country,funds_raised_millions) row_num
+from layoffs_staging)
+select *
+from duplicate_cte
+where row_num >1;
+
+
+select *
+from layoffs_staging
+where company = 'yahoo';
+
+CREATE TABLE `layoffs_staging2` (
+  `company` text,
+  `location` text,
+  `industry` text,
+  `total_laid_off` int DEFAULT NULL,
+  `percentage_laid_off` text,
+  `date` text,
+  `stage` text,
+  `country` text,
+  `funds_raised_millions` int DEFAULT NULL,
+  `row_num` int
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+select *
+from layoffs_staging2;
+
+insert into 
+layoffs_staging2
+select *,
+row_number() over(partition by company,location,industry,total_laid_off,`date`,stage,country,funds_raised_millions) row_num
+from layoffs_staging;
+
+
+select *
+from layoffs_staging2
+where row_num > 1;
+
+delete
+from layoffs_staging2
+where row_num > 1;
+
+select *
+from layoffs_staging2;
+
+-- ----------------------------------------------------------------------Standardizing data-------------------------------------------------------------------------------------
+
+select company, trim(company)
+from layoffs_staging2;
+
+update layoffs_staging2
+set company = trim(company);
+
+select *
+from layoffs_staging2
+where industry like 'crypto%';
+
+update layoffs_staging2
+set industry = 'Crypto'
+where industry like 'crypto%';
+
+
+select distinct country, trim(trailing '.' from country)
+from layoffs_staging2
+order by 1;
+
+update layoffs_staging2
+set country = trim(trailing '.' from country)
+where country like 'united states%';
+
+
+select `date`,
+str_to_date(`date`, '%m/%d/%Y')
+from layoffs_staging2;
+
+update layoffs_staging2
+set `date` = str_to_date(`date`, '%m/%d/%Y');
+
+select `date`
+from layoffs_staging2;
+
+alter table layoffs_staging2
+modify column `date` date;
+
+select *
+from layoffs_staging2
+where total_laid_off is null and percentage_laid_off is null;
+
+
+select *
+from layoffs_staging2
+where industry is null or industry = '';
+
+select *
+from layoffs_staging2
+where company = 'airbnb';
+
+
+select *
+from layoffs_staging2 T1
+join layoffs_staging2 T2
+	on t1.company = t2.company
+where t1.industry is null
+and t2.industry is not null;
+
+update layoffs_staging2
+set industry = null
+where industry = ' ';
+
+update layoffs_staging2 T1
+join layoffs_staging2 T2
+	on t1.company = t2.company
+set t1.industry = t2.industry
+where t1.industry is null 
+and t2.industry is not null;
+
+
+select *
+from layoffs_staging2
+where total_laid_off is null and percentage_laid_off is null;
+
+select count(*)
+from layoffs_staging2
+where total_laid_off is null and percentage_laid_off is null;
+
+delete
+from layoffs_staging2
+where total_laid_off is null and percentage_laid_off is null;
+
+select *
+from layoffs_staging2;
+
+alter table layoffs_staging2
+drop row_num;
+
+
+-- -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- -------------------------------------------------------- Exploratory Data Analysis---------------------------------------------------------------------------------------------
+
+select max(total_laid_off)
+from layoffs_staging2;
+
+select company, sum(total_laid_off) laid_off
+from layoffs_staging2
+group by company
+order by laid_off desc;
+
+select min(`date`), max(`date`)
+from layoffs_staging2;
+
+select industry, sum(total_laid_off) laid_off
+from layoffs_staging2
+group by industry
+order by laid_off desc;
+
+
+select country, sum(total_laid_off) laid_off
+from layoffs_staging2
+group by country
+order by laid_off desc;
+
+select year(`date`), sum(total_laid_off) laid_off
+from layoffs_staging2
+group by year(`date`)
+order by laid_off desc;
+
+select stage, sum(total_laid_off) laid_off
+from layoffs_staging2
+group by stage
+order by laid_off desc;
+
+
+select substring(`date`,1,7) `month`,sum(total_laid_off) laid_off
+from layoffs_staging2
+where substring(`date`,1,7)  is not null
+group by `month`
+order by 1 asc;
+
+with rolling_total as
+(select substring(`date`,1,7) `month`,sum(total_laid_off) laid_off
+from layoffs_staging2
+where substring(`date`,1,7)  is not null
+group by `month`
+order by 1 asc
+)
+select `month`, laid_off,sum(laid_off) over(order by `month`) rolling_total
+from rolling_total;
+
+
+select company, year(`date`), sum(total_laid_off) laid_off
+from layoffs_staging2
+group by company, year(`date`)
+order by 3 desc;
+
+with company_year(company, years, total_laid_off) as
+(select company, year(`date`), sum(total_laid_off) laid_off
+from layoffs_staging2
+group by company, year(`date`)
+),company_year_rank as
+(select *,dense_rank() over (partition by years order by total_laid_off desc) ranking
+from company_year
+where years is not null
+)
+select*
+from company_year_rank
+where ranking <= 5
