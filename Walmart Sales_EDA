@@ -1,0 +1,244 @@
+select * 
+from sales_data;
+
+-- ---------------------------------------------------------------------------------------------------------------
+-- ------------------------------- Feature Engineering------------------------------------------------------------
+
+-- time_of_day
+
+select time,
+(case
+when `time` between '00:00:00' and '11:59:59' then 'Morning'
+when `time` between '10:00:00' and '15:59:59' then 'Afternoon'
+else 'Evening'
+end
+) time_of_day
+from sales_data;
+
+alter table sales_data
+add column time_of_day varchar(20);
+
+update sales_data
+set time_of_day = (
+case
+	when `time` between '00:00:00' and '11:59:59' then 'Morning'
+	when `time` between '10:00:00' and '15:59:59' then 'Afternoon'
+	else 'Evening'
+end);
+
+-- Day_Name
+select date, dayname(date) day_name
+from sales_data;
+
+alter table sales_data add column day_name varchar(10);
+
+update sales_data
+set day_name = dayname(date);
+
+-- Month_Name
+select date, monthname(date) month_name
+from sales_data;
+
+alter table sales_data add column month_name varchar(10);
+
+update sales_data
+set month_name = monthname(date);
+
+-- --------------------------------------------------------------------------------------------------------------------
+-- -------------------------------------Generic------------------------------------------------------------------------
+
+-- How many unique cities does the data have?
+select distinct city
+from sales_data;
+
+
+-- How many unique branches does the data have?
+select distinct branch
+from sales_data;
+
+-- Which city is each branch in?
+select branch, city
+from sales_data
+group by branch, city;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- ---------------------------------Product-----------------------------------------------------------------------------
+
+-- How many unique product lines does the data have?
+select count(distinct `product line`)
+from sales_data;
+
+-- What is the most common payment method?
+select payment, count(payment) count
+from sales_data
+group by payment
+order by count desc;
+
+-- What product line sells the most?
+select `product line`,sum(quantity) sold
+from sales_data
+group by `Product line` 
+order by sold desc
+limit 1;
+
+
+-- What is the total revenue by month?
+select month_name, round(sum(total),2)total_revenue
+from sales_data
+group by month_name
+order by total_revenue desc;
+
+-- What month had the highest COGS?
+select month_name, round(sum(cogs),2) COGS
+from sales_data
+group by month_name
+order by COGS desc
+limit 1;
+
+-- What product line had the largest revenue?
+select `product line`, round(sum(total),2)total_revenue
+from sales_data
+group by `product line`
+order by total_revenue desc
+limit 1;
+-- What is the city with the largest revenue?
+select city, round(sum(total),2)total_revenue
+from sales_data
+group by city
+order by total_revenue desc
+limit 1;
+
+-- What product line had the largest VAT? ( VAT = The amount of tax on the purchase)
+select `product line`, round(sum(0.05 * cogs),2) vat
+from sales_data
+group by `product line`
+order by vat desc
+limit 1;
+
+-- Fetch each product line and add a column to those product line showing "Good", "Bad".
+-- Good if its greater than average sales
+select round(avg(total),2)
+from sales_data;
+
+select `product line`,avg(total),
+(case
+when avg(total) > 322.97 then 'Good'
+when avg(total) < 322.97 then 'Bad'
+end
+) G_B
+from sales_data
+group by `product line`;
+
+
+-- Which branch sold more products than average product sold?
+select branch, avg(quantity) avg_branch
+from sales_data
+group by branch
+having avg_branch >(select avg(quantity) from sales_data);
+
+-- What is the most common product line by gender?
+select gender, `product line`,count(gender) gdr_cnt
+from sales_data
+group by gender,`product line`
+order by gender, gdr_cnt desc;
+
+
+-- What is the average rating of each product line?
+select `product line`, round(avg(rating),2) avg_rating
+from sales_data
+group by `product line`
+order by avg_rating desc;
+
+-- ----------------------------------------------------------------------------------------------------------------------
+-- -------------------------------------------Sales----------------------------------------------------------------------
+
+-- Number of sales made in each time of the day per weekday
+select time_of_day, day_name, count(*) sales
+from sales_data
+group by time_of_day, day_name
+order by time_of_day, sales desc;
+
+
+-- Which of the customer types brings the most revenue?
+select `customer type`, round(sum(total),2) total_revenue
+from sales_data
+group by `customer type`;
+
+
+-- Which city has the largest VAT (Value Added Tax)?
+select city, round(avg(0.05 * cogs),2) vat
+from sales_data
+group by city
+order by vat desc
+limit 1;
+
+
+-- Which customer type pays the most in VAT?
+select `customer type`, round(avg( 0.05 * cogs)) vat
+from sales_data
+group by `customer type`
+order by vat;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- ------------------------------------------Customer-------------------------------------------------------------------
+
+ -- How many unique customer types does the data have?
+select distinct `customer type`
+from sales_data;
+
+-- How many unique payment methods does the data have?
+
+select distinct payment 
+from sales_data;
+
+-- What is the most common customer type?
+select `customer type`, count(`customer type`)
+from sales_data
+group by `customer type`;
+
+
+-- Which customer type buys the most?
+select `customer type`, sum(quantity)
+from sales_data
+group by `customer type`;
+
+
+-- What is the gender of most of the customers?
+select gender,count(gender)
+from sales_data
+group by gender;
+
+
+-- What is the gender distribution per branch?
+select branch, gender, count(gender) gndr_cnt
+from sales_data
+group by branch, gender
+order by branch, gender;
+
+-- Which time of the day do customers give highest ratings?
+select time_of_day, round(avg(rating),2) avg_rating
+from sales_data
+group by time_of_day
+order by avg_rating desc;
+
+
+-- Which time of the day do customers give highest ratings per branch?
+select branch,time_of_day,round(avg(rating),2) avg_rating
+from sales_data
+group by branch,time_of_day
+order by branch, avg_rating desc ;
+
+-- Which day of the week has the best avg ratings?
+select day_name, round(avg(rating),2) avg_rating
+from sales_data
+group by day_name
+order by avg_rating desc
+limit 1;
+
+-- Which day of the week has the best average ratings per branch?
+select  day_name,branch, round(avg(rating),2) avg_rating
+from sales_data
+group by Branch,day_name
+order by day_name,avg_rating desc
+limit 100;
+select * from  sales_data;
